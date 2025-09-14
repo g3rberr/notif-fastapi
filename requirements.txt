@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+redis>=5.0
+SQLAlchemy>=2.0
+asyncpg
+pydantic>=2
+pydantic-settings>=2
+orjson
