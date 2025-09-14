@@ -1,0 +1,66 @@
+services:
+  api:
+    build: .
+    container_name: notif_api
+    env_file: .env
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --workers
+      - "8"
+      - --no-server-header
+      - --proxy-headers
+      - --backlog
+      - "2048"
+      - --timeout-keep-alive
+      - "5"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: .
+    container_name: notif_worker
+    env_file: .env
+    command: ["python", "-m", "app.workers.consumer"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db:
+    image: postgres:15
+    container_name: notif_pg
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    command: ["postgres", "-c", "max_connections=400", "-c", "shared_buffers=256MB"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME} -h 127.0.0.1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    container_name: notif_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
