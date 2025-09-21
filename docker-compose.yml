@@ -11,29 +11,79 @@ services:
       - --port
       - "8000"
       - --workers
-      - "8"
+      - "16"
       - --no-server-header
-      - --proxy-headers
+      - --no-access-log
+      - --log-level
+      - warning
       - --backlog
-      - "2048"
+      - "4096"
       - --timeout-keep-alive
       - "5"
+      - --loop
+      - uvloop
+      - --http
+      - httptools
     ports:
       - "8000:8000"
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
 
+
   worker:
     build: .
     container_name: notif_worker
     env_file: .env
-    command: ["python", "-m", "app.workers.consumer"]
+    command:
+      - celery
+      - -A
+      - app.services.celery_app.celery
+      - worker
+      - --loglevel=info
+      - --concurrency=8
+      - --prefetch-multiplier=1
+      - --queues=default
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+ 
+  dispatcher:
+    build: .
+    container_name: notif_dispatcher
+    env_file: .env
+    command:
+      - python
+      - -m
+      - app.services.dispatcher
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  flower:
+    build: .
+    container_name: notif_flower
+    env_file: .env
+    command: ["celery", "-A", "app.services.celery_app.celery", "flower", "--port=5555"]
+    ports:
+      - "5555:5555"
+    depends_on:
       redis:
         condition: service_started
 
@@ -59,8 +109,25 @@ services:
   redis:
     image: redis:7
     container_name: notif_redis
+    command:
+      - redis-server
+      - --save
+      - --appendonly
+      - "no"
+      - --maxclients
+      - "20000"
+      - --tcp-backlog
+      - "65535"
+      - --timeout
+      - "0"
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
 
 volumes:
   pgdata:

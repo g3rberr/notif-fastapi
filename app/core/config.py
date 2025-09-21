@@ -11,9 +11,21 @@ class Settings(BaseSettings):
     db_pass: str | None = None
     db_name: str | None = None
 
-    redis_url: str
-    redis_channel: str = "task_events"
+    redis_url: str = "redis://redis:6379/0"
+
     log_level: str = "INFO"
+
+    smtp_host: str
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_pass: str | None = None
+    smtp_use_tls: bool = True
+    smtp_from: str | None = None
+
+    max_attempts: int = 5
+    backoff_base_sec: float = 2.0
+    backoff_cap_sec: float = 300.0
+    backoff_jitter_frac: float = 0.25
 
     model_config = SettingsConfigDict(
         env_file=".env",

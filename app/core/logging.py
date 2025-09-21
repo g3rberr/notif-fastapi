@@ -1,5 +1,4 @@
-import logging
-import os
+import logging, os
 
 def setup_logging():
     level = os.getenv("LOG_LEVEL", "INFO").upper()
